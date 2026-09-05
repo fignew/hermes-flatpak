@@ -14,13 +14,6 @@
 export ELECTRON_OZONE_PLATFORM_HINT=auto
 export HERMES_DESKTOP_HERMES_ROOT=/app/lib/hermes-agent
 export HERMES_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/hermes"
-# Container engine: prefer host rootless podman (docker-API socket), fall
-# back to a user docker daemon socket, else leave docker's default.
-if [ -S "${XDG_RUNTIME_DIR}/podman/podman.sock" ]; then
-  export DOCKER_HOST="unix://${XDG_RUNTIME_DIR}/podman/podman.sock"
-elif [ -S "${XDG_RUNTIME_DIR}/docker.sock" ]; then
-  export DOCKER_HOST="unix://${XDG_RUNTIME_DIR}/docker.sock"
-fi
 exec zypak-wrapper.sh /app/hermes/Hermes \
   --wayland-app-id=dev.nousresearch.hermes \
   --class=dev.nousresearch.hermes \

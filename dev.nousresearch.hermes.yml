@@ -22,14 +22,6 @@ finish-args:
   # Notifications: Electron's Notification API talks to the session
   # notification daemon over D-Bus (org.freedesktop.Notifications).
   - --talk-name=org.freedesktop.Notifications
-  # Podman/docker API socket: containers run on the HOST (rootless podman
-  # system service speaks the docker API); the sandboxed agent controls
-  # them through this socket. Containers cannot run INSIDE a flatpak
-  # (user namespaces are blocked). Host prerequisite:
-  #   systemctl --user enable --now podman.socket
-  - --filesystem=xdg-run/podman
-  # Fallback: a user-session docker daemon socket, if present.
-  - --filesystem=xdg-run/docker.sock
 modules:
   # git 2.55.0 — the bundled agent uses git operationally (repo status,
   # version stamping). Built from the released tarball against the Sdk.
@@ -60,19 +52,6 @@ modules:
       - type: archive
         url: https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz
         sha256: 4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
-        strip-components: 0
-
-  # docker CLI (client only, v29.8.0) — docker-API compatibility backed by
-  # host podman via its socket. No engine is bundled: containers cannot run
-  # inside a flatpak sandbox (user namespaces blocked).
-  - name: docker-cli
-    buildsystem: simple
-    build-commands:
-      - install -Dm755 docker/docker /app/bin/docker
-    sources:
-      - type: archive
-        url: https://download.docker.com/linux/static/stable/x86_64/docker-29.8.0.tgz
-        sha256: cc21815cf1e2efed867dc9c8b96b46ffed8ea176ffab32b0aacb54726ded8f25
         strip-components: 0
 
   - name: hermes-desktop
