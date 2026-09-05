@@ -8,3 +8,4 @@ payloadsrc/
 *.flatpak
 uvcache/
 buildhome/
+hermes-src/
