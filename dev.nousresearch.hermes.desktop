@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Hermes
+GenericName=AI Agent
+Comment=Native desktop shell for Hermes Agent
+Exec=hermes-desktop %U
+Icon=dev.nousresearch.hermes
+Terminal=false
+Categories=Development;Utility;Network;
+StartupWMClass=dev.nousresearch.hermes
+MimeType=x-scheme-handler/hermes;

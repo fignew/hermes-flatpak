@@ -1,0 +1,161 @@
+app-id: dev.nousresearch.hermes
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: "25.08"
+command: hermes-desktop
+separate-locales: false
+finish-args:
+  # Agent needs outbound network (LLM APIs, updates, gateway)
+  - --share=network
+  # Display: prefer wayland (hint=auto in wrapper), x11 fallback
+  - --socket=wayland
+  - --socket=x11
+  # Voice conversations (mic capture + playback)
+  - --socket=pulseaudio
+  # GPU acceleration
+  - --device=dri
+  # Chat exports / user file handoff via well-known dir; everything else
+  # goes through portals. Deliberately NO --filesystem=home.
+  - --filesystem=xdg-download
+  # Notifications: Electron's Notification API talks to the session
+  # notification daemon over D-Bus (org.freedesktop.Notifications).
+  - --talk-name=org.freedesktop.Notifications
+  # Podman/docker API socket: containers run on the HOST (rootless podman
+  # system service speaks the docker API); the sandboxed agent controls
+  # them through this socket. Containers cannot run INSIDE a flatpak
+  # (user namespaces are blocked). Host prerequisite:
+  #   systemctl --user enable --now podman.socket
+  - --filesystem=xdg-run/podman
+  # Fallback: a user-session docker daemon socket, if present.
+  - --filesystem=xdg-run/docker.sock
+modules:
+  # git 2.55.0 — the bundled agent uses git operationally (repo status,
+  # version stamping). Built from the released tarball against the Sdk.
+  - name: git
+    buildsystem: simple
+    build-commands:
+      # NO_RUST: git >=2.55 has an optional Rust component; the Sdk has no
+      # cargo and upstream defines NO_RUST exactly for this (Rust becomes
+      # mandatory only in Git 3.0).
+      - ./configure --prefix=/app --without-tcltk
+      - make -j2 all NO_RUST=1
+      - make install NO_RUST=1
+      - rm -rf /app/share/gitweb /app/share/locale
+    sources:
+      - type: archive
+        url: https://www.kernel.org/pub/software/scm/git/git-2.55.0.tar.xz
+        sha256: 457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357
+
+  # ripgrep 14.1.1 — the agent's file search prefers rg over grep; bundling
+  # the static musl binary keeps that fast path inside the sandbox.
+  - name: ripgrep
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 ripgrep-14.1.1-x86_64-unknown-linux-musl/rg /app/bin/rg
+      - install -Dm644 ripgrep-14.1.1-x86_64-unknown-linux-musl/COPYING -t /app/share/licenses/ripgrep/
+      - install -Dm644 ripgrep-14.1.1-x86_64-unknown-linux-musl/UNLICENSE -t /app/share/licenses/ripgrep/
+    sources:
+      - type: archive
+        url: https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz
+        sha256: 4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
+        strip-components: 0
+
+  # docker CLI (client only, v29.8.0) — docker-API compatibility backed by
+  # host podman via its socket. No engine is bundled: containers cannot run
+  # inside a flatpak sandbox (user namespaces blocked).
+  - name: docker-cli
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 docker/docker /app/bin/docker
+    sources:
+      - type: archive
+        url: https://download.docker.com/linux/static/stable/x86_64/docker-29.8.0.tgz
+        sha256: cc21815cf1e2efed867dc9c8b96b46ffed8ea176ffab32b0aacb54726ded8f25
+        strip-components: 0
+
+  - name: hermes-desktop
+    buildsystem: simple
+    build-options:
+      env:
+        PATH: /app/bin:/usr/lib/sdk/node22/bin:/usr/bin:/bin:/usr/sbin:/sbin
+        # node-gyp: use the Sdk extension's headers; downloading node's
+        # headers tarball fails inside bwrap (tar fchown EINVAL as root).
+        npm_config_nodedir: /usr/lib/sdk/node22
+      build-args:
+        - --share=network
+    build-commands:
+      # One block: only /app and this module dir persist between commands.
+      # 1) Bundle the agent backend: repo at the pinned commit + venv
+      #    pre-synced (uv sync --locked, hash-verified) so the desktop's
+      #    resolver adopts it at runtime (bootstrap: false) and first-run
+      #    needs no git/python toolchain/network install.
+      # 2) Build the desktop payload in the sandbox so native modules
+      #    (node-pty) link against the RUNTIME's glibc.
+      - |
+        set -e
+        MODDIR=$(pwd)
+        export HOME=$MODDIR/buildhome
+        mkdir -p "$HOME"
+        export UV_CACHE_DIR=$MODDIR/uvcache
+        export UV_LINK_MODE=copy
+        export UV_PYTHON=/usr/bin/python3
+        # flatpak-builder strips the archive's top-level dir by default, so
+        # the binaries may land at uv-dist/uv OR uv-dist/<triplet>/uv.
+        UVBIN="$MODDIR/uv-dist/uv-x86_64-unknown-linux-gnu"
+        [ -x "$UVBIN/uv" ] || UVBIN="$MODDIR/uv-dist"
+        export PATH="$UVBIN:$PATH"
+        command -v uv >/dev/null || { echo "FATAL: uv not found in $MODDIR/uv-dist"; ls -la "$MODDIR/uv-dist"; exit 1; }
+        git config --global --add safe.directory "$MODDIR/hermes-agent"
+        git config --global --add safe.directory /app/lib/hermes-agent
+        mkdir -p /app/lib /app/etc
+        cp -a hermes-agent /app/lib/hermes-agent
+        cd /app/lib/hermes-agent
+        uv sync --locked --extra all
+        # Ship a system gitconfig so the bundled agent can operate on its
+        # (root-owned, read-only) checkout without "dubious ownership".
+        printf '[safe]\n\tdirectory = /app/lib/hermes-agent\n' > /app/etc/gitconfig
+        # 2) desktop payload
+        # npm ci resolves workspaces from the repo ROOT, not from a subdir.
+        cd "$MODDIR/hermes-agent"
+        npm ci --workspace apps/desktop --workspace apps/shared --no-audit --no-fund
+        cd apps/desktop
+        npm run build
+        NODE_OPTIONS=--max-old-space-size=4096 node scripts/run-electron-builder.mjs --linux dir --x64
+        mkdir -p /app/hermes
+        cp -ra release/linux-unpacked/. /app/hermes/
+        install -Dm755 "$MODDIR/hermes.sh" /app/bin/hermes-desktop
+        install -Dm755 "$MODDIR/hermes-cli.sh" /app/bin/hermes
+        install -Dm644 "$MODDIR/dev.nousresearch.hermes.desktop" -t /app/share/applications/
+        # Version coherence: the flatpak's public version is the AGENT's
+        # version (pyproject.toml), not the desktop npm package version.
+        AGENT_VERSION=$(grep -m1 '^version = ' "$MODDIR/hermes-agent/pyproject.toml" | sed 's/version = "\(.*\)"/\1/')
+        AGENT_DATE=$(git -C "$MODDIR/hermes-agent" log -1 --format=%cs)
+        sed -i "s/@AGENT_VERSION@/$AGENT_VERSION/; s/@AGENT_DATE@/$AGENT_DATE/" "$MODDIR/dev.nousresearch.hermes.metainfo.xml"
+        install -Dm644 "$MODDIR/dev.nousresearch.hermes.metainfo.xml" -t /app/share/metainfo/
+        install -Dm644 "$MODDIR/dev.nousresearch.hermes.png" /app/share/icons/hicolor/512x512/apps/dev.nousresearch.hermes.png
+        install -Dm644 "$MODDIR/dev.nousresearch.hermes.png" /app/share/icons/hicolor/256x256/apps/dev.nousresearch.hermes.png
+        desktop-file-validate /app/share/applications/dev.nousresearch.hermes.desktop
+    sources:
+      # Local clean clone of the monorepo, checked out at the pinned commit.
+      # (A remote github URL works too, but re-fetching during iterative
+      # builds burns API rate limit — 429 mid-build with this exact failure
+      # mode: bundling the STALE commit from the previous repo state.)
+      - type: dir
+        path: hermes-agent-src
+        dest: hermes-agent
+      - type: archive
+        url: https://github.com/astral-sh/uv/releases/download/0.12.9/uv-x86_64-unknown-linux-gnu.tar.gz
+        sha256: ec7a99cd05e0cd7f80243f135ce1361c76835cb0ee60055d14d20eba8eba1460
+        dest: uv-dist
+      - type: file
+        path: hermes.sh
+      - type: file
+        path: hermes-cli.sh
+      - type: file
+        path: dev.nousresearch.hermes.desktop
+      - type: file
+        path: dev.nousresearch.hermes.metainfo.xml
+      - type: file
+        path: dev.nousresearch.hermes.png

@@ -1,0 +1,10 @@
+build-dir/
+repo/
+state/
+pinned/
+hermes-agent-src/
+hermes-agent/
+payloadsrc/
+*.flatpak
+uvcache/
+buildhome/

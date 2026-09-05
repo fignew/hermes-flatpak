@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.nousresearch.hermes</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Hermes</name>
+  <summary>Native desktop shell for Hermes Agent</summary>
+  <description>
+    <p>Hermes Desktop is the native desktop shell for Hermes Agent, an AI agent
+    with advanced tool-calling capabilities. It provides chat sessions, terminal
+    integration, and file workflows in a sandboxed desktop application.</p>
+  </description>
+  <launchable type="desktop-id">dev.nousresearch.hermes.desktop</launchable>
+  <url type="homepage">https://github.com/NousResearch/hermes-agent</url>
+  <developer_name>Nous Research</developer_name>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@AGENT_VERSION@" date="@AGENT_DATE@">
+      <description><p>Initial flatpak packaging.</p></description>
+    </release>
+  </releases>
+</component>
