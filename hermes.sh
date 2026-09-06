@@ -24,6 +24,15 @@ if [ ! -L "$HOME/.cua-driver" ]; then rm -rf "$HOME/.cua-driver"; ln -s "$XDG_DA
 mkdir -p "$HOME/.local"
 if [ ! -L "$HOME/.local/bin" ]; then rm -rf "$HOME/.local/bin"; ln -s "$XDG_DATA/local-bin" "$HOME/.local/bin"; fi
 export PATH="$XDG_DATA/local-bin:$PATH"
+# The desktop replaces PATH from a login shell when spawning the backend
+# ("merged login-shell PATH"), which drops the export above. Persist the
+# PATH addition into the shell rc files (ephemeral, recreated each launch)
+# so bash -l, interactive shells, and sh -c all see ~/.local/bin.
+SNIP='export PATH="$HOME/.local/bin:$PATH" # flatpak-local-bin'
+for RC in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc"; do
+  [ -f "$RC" ] || : > "$RC"
+  grep -q "flatpak-local-bin" "$RC" || printf '\n%s\n' "$SNIP" >> "$RC"
+done
 exec zypak-wrapper.sh /app/hermes/Hermes \
   --wayland-app-id=dev.nousresearch.hermes \
   --class=dev.nousresearch.hermes \
