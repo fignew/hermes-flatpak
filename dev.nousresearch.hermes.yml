@@ -54,6 +54,36 @@ modules:
         sha256: 4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
         strip-components: 0
 
+  # cua-driver 0.23.2 — Computer Use driver, bundled so the agent's
+  # computer_use tool works with NO runtime install step. The upstream
+  # installer targets ~/.local/bin, which is ephemeral in the sandbox home
+  # and off the desktop's merged login-shell PATH; /app/bin is on PATH for
+  # every process in the sandbox (bundled git/rg/hermes rely on the same
+  # property). Layout mirrors the upstream installer: binary + cursor theme
+  # colocated in one dir with the PATH symlink pointing at the binary (the
+  # driver resolves cua-cursor-theme next to its own resolved path).
+  # Hermes' runtime contract floor is 0.20.0 (cua_backend.py) — 0.23.2
+  # satisfies it. Upstream stable channel: cua-driver-rs-v0.23.2 tag; the
+  # tarball sha256 below was verified against that release's checksums.txt.
+  # Re-pin by re-downloading into pinned/ + updating this hash.
+  # The tarball also carries libcua_driver_sdk.so (39 MB) +
+  # cua_driver_node_runtime.node + cua_driver_abi.h — SDK pieces for
+  # embedders, NOT needed by the CLI (no NEEDED entries) — skipped here.
+  - name: cua-driver
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 cua-driver -t /app/lib/cua-driver/
+      - install -Dm755 cua-cursor-theme -t /app/lib/cua-driver/
+      - cp -R wayland-helper /app/lib/cua-driver/wayland-helper
+      - ln -s /app/lib/cua-driver/cua-driver /app/bin/cua-driver
+    sources:
+      - type: archive
+        path: pinned/cua-driver-rs-0.23.2-linux-x86_64-binary.tar.gz
+        sha256: 01bf8339ec129cc00f4b4b2c6056ef1a7c5b52df39ff83ad17c9b16818aec500
+        strip-components: 0
+        # upstream url:
+        # https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.23.2/cua-driver-rs-0.23.2-linux-x86_64-binary.tar.gz
+
   - name: hermes-desktop
     buildsystem: simple
     build-options:
