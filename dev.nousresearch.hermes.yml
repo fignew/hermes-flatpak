@@ -89,6 +89,8 @@ modules:
         strip-components: 0
         # upstream url:
         # https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.23.2/cua-driver-rs-0.23.2-linux-x86_64-binary.tar.gz
+      - type: file
+        path: cua-driver.sh
 
   - name: hermes-desktop
     buildsystem: simple
@@ -168,8 +170,6 @@ modules:
         path: hermes.sh
       - type: file
         path: hermes-cli.sh
-      - type: file
-        path: cua-driver.sh
       - type: file
         path: dev.nousresearch.hermes.desktop
       - type: file
