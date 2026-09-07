@@ -75,7 +75,13 @@ modules:
       - install -Dm755 cua-driver -t /app/lib/cua-driver/
       - install -Dm755 cua-cursor-theme -t /app/lib/cua-driver/
       - cp -R wayland-helper /app/lib/cua-driver/wayland-helper
-      - ln -s /app/lib/cua-driver/cua-driver /app/bin/cua-driver
+      # /app/bin/cua-driver is a WRAPPER (not a symlink): it exports
+      # CUA_DRIVER_RS_TELEMETRY_ENABLED=0 before exec'ing the real binary,
+      # so bundled-driver invocations never send telemetry (env override is
+      # first in the driver's consent precedence). The binary itself stays
+      # in /app/lib/cua-driver/ so cua-cursor-theme keeps resolving next to
+      # the resolved path, same as the upstream installer layout.
+      - install -Dm755 cua-driver.sh /app/bin/cua-driver
     sources:
       - type: archive
         path: pinned/cua-driver-rs-0.23.2-linux-x86_64-binary.tar.gz
@@ -162,6 +168,8 @@ modules:
         path: hermes.sh
       - type: file
         path: hermes-cli.sh
+      - type: file
+        path: cua-driver.sh
       - type: file
         path: dev.nousresearch.hermes.desktop
       - type: file
