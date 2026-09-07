@@ -9,6 +9,12 @@ separate-locales: false
 finish-args:
   # Agent needs outbound network (LLM APIs, updates, gateway)
   - --share=network
+  # Opt cua-driver into its experimental native-Wayland backend sandbox-wide
+  # (env override; reaches the gateway and every cua-driver it spawns —
+  # wrapper exports alone don't propagate to already-running MCP daemons).
+  # On niri/wlroots this enables portal-Screenshot capture and the libei
+  # RemoteDesktop input probe; inert on X11-only sessions (no WAYLAND_DISPLAY).
+  - --env=CUA_DRIVER_RS_ENABLE_WAYLAND=1
   # Display: prefer wayland (hint=auto in wrapper), x11 fallback
   - --socket=wayland
   - --socket=x11
@@ -22,6 +28,12 @@ finish-args:
   # Notifications: Electron's Notification API talks to the session
   # notification daemon over D-Bus (org.freedesktop.Notifications).
   - --talk-name=org.freedesktop.Notifications
+  # Accessibility bus (cua-driver ax/element targeting). Flatpak's bus proxy
+  # special-cases org.a11y.Bus and wires AT_SPI_BUS_ADDRESS into the sandbox
+  # when this grant is present. Only effective when the HOST session runs
+  # at-spi2 (org.a11y.Bus on its session bus) — e.g. GNOME; on niri the host
+  # session must start at-spi (at-spi-bus-launcher / GTK_MODULES=atk-bridge).
+  - --talk-name=org.a11y.Bus
 modules:
   # git 2.55.0 — the bundled agent uses git operationally (repo status,
   # version stamping). Built from the released tarball against the Sdk.
