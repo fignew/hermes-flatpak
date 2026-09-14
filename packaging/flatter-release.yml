@@ -1,0 +1,140 @@
+name: flatter-release
+
+# Build a flatpak for a tagged Hermes release. Dispatched by upstream-watch.yml
+# when a new tag appears on NousResearch/hermes-agent (or run manually with
+# an existing tag name).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "upstream hermes-agent release tag (e.g. v2026.9.14)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flatter-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  flatter:
+    name: "Release ${{ inputs.tag }} (${arch})"
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    container:
+      image: ghcr.io/andyholmes/flatter/freedesktop:25.08
+      options: --privileged
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+      fail-fast: false
+      max-parallel: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify tag exists upstream and get its commit
+        id: upstream
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          for i in 1 2 3; do
+            COMMIT=$(git ls-remote https://github.com/NousResearch/hermes-agent.git "refs/tags/$TAG" | awk '{print $1}') && [ -n "$COMMIT" ] && break
+            echo "attempt $i: ls-remote failed; retrying in 30s"
+            sleep 30
+          done
+          [ -n "$COMMIT" ] || { echo "::error::tag '$TAG' not found on NousResearch/hermes-agent"; exit 1; }
+          AGENT_VER=$(curl -fsSL "https://raw.githubusercontent.com/NousResearch/hermes-agent/$COMMIT/pyproject.toml" \
+            | grep -m1 '^version = ' | sed 's/version = "\(.*\)"/\1/')
+          echo "ref=$TAG"            >> "$GITHUB_OUTPUT"
+          echo "commit=$COMMIT"      >> "$GITHUB_OUTPUT"
+          echo "version=$AGENT_VER"  >> "$GITHUB_OUTPUT"
+          echo "::notice::packaging hermes-agent $AGENT_VER @ $COMMIT (tag $TAG)"
+
+      - name: Generate CI manifest
+        env:
+          HERMES_REF: ${{ steps.upstream.outputs.ref }}
+        run: python3 packaging/generate-manifest.py
+
+      - name: Build
+        uses: andyholmes/flatter@main
+        with:
+          files: |
+            dev.nousresearch.hermes.yml
+          arch: ${{ matrix.arch }}
+          upload-bundles: true
+          flatpak-build-bundle-args: |
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
+          cache-key: flatter-${{ matrix.arch }}
+
+      - name: Rename + smoke test bundle
+        id: bundle
+        run: |
+          set -euo pipefail
+          NAME="Hermes-${{ steps.upstream.outputs.version }}-${{ matrix.arch }}.flatpak"
+          [ -f dev.nousresearch.hermes.flatpak ] || { ls -la; echo "::error::bundle missing"; exit 1; }
+          mv dev.nousresearch.hermes.flatpak "$NAME"
+          chmod +x packaging/smoke-test.sh
+          ./packaging/smoke-test.sh "$NAME"
+          mkdir -p bundle
+          cp "$NAME" bundle/
+          sha256sum "$NAME" > "bundle/$NAME.sha256"
+          echo "version=${{ steps.upstream.outputs.version }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hermes-${{ steps.upstream.outputs.version }}-${{ matrix.arch }}
+          path: bundle/*
+          retention-days: 7
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: flatter
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.ver }}
+    steps:
+      - name: Determine packaged version
+        id: version
+        run: |
+          VER=$(ls bundles/Hermes-*-x86_64.flatpak | sed 's/.*Hermes-\(.*\)-x86_64\.flatpak/\1/')
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Download bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: bundles
+          pattern: Hermes-*
+          merge-multiple: true
+
+      - name: Publish tagged release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          # DERIVE $VER from the bundle filenames in this job (avoids matrix
+          # job-output propagation, which GitHub only propagates from the
+          # last matrix leg). Version derived at build time from
+          # pyproject.toml may differ slightly from the upstream tag —
+          # publish as the manifest-derived version, keeping the upstream
+          # tag as the fetch handle.
+          VER=$(ls bundles/Hermes-*-x86_64.flatpak | sed 's/.*Hermes-\(.*\)-x86_64\.flatpak/\1/')
+          # A release tag on the flatpak repo
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Hermes $VER (flatpak)" \
+            --notes "Flatpak for hermes-agent release [$TAG](https://github.com/NousResearch/hermes-agent/releases/tag/$TAG) (packaged version $VER).
+
+          Install:
+              flatpak install --user ./Hermes-$VER-x86_64.flatpak" \
+            bundles/*
