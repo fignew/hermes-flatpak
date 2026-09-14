@@ -122,7 +122,7 @@ jobs:
           # DERIVE $VER from the bundle filenames in this job (avoids matrix
           # job-output propagation, which GitHub only propagates from the
           # last matrix leg). Version derived at build time from
-          # pyproject.toml may differ slightly from the upstream tag —
+          # pyproject.toml may differ slightly from the upstream tag ?
           # publish as the manifest-derived version, keeping the upstream
           # tag as the fetch handle.
           VER=$(ls bundles/Hermes-*-x86_64.flatpak | sed 's/.*Hermes-\(.*\)-x86_64\.flatpak/\1/')
