@@ -138,3 +138,5 @@ jobs:
           Install:
               flatpak install --user ./Hermes-$VER-x86_64.flatpak" \
             bundles/*
+
+# registration touch
