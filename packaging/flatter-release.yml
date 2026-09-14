@@ -64,6 +64,18 @@ jobs:
           HERMES_REF: ${{ steps.upstream.outputs.ref }}
         run: python3 packaging/generate-manifest.py
 
+      # Preinstall the runtime + BaseApp + Sdk extension the manifest depends on.
+      # The flatter container has flathub added as a remote but does NOT bundle
+      # the freedesktop 25.08 SDK stack — see flatter.yml's identical step.
+      - name: Install runtime dependencies
+        run: |
+          set -euo pipefail
+          flatpak install -y --system flathub \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk//25.08 \
+            org.freedesktop.Sdk.Extension.node22//25.08 \
+            org.electronjs.Electron2.BaseApp//25.08
+
       - name: Build
         uses: andyholmes/flatter@main
         with:

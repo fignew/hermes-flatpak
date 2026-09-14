@@ -64,6 +64,18 @@ jobs:
           HERMES_REF: ${{ steps.upstream.outputs.ref }}
         run: python3 packaging/generate-manifest.py
 
+      # Preinstall the runtime + BaseApp + Sdk extension the manifest depends on.
+      # The flatter container has flathub added as a remote but does NOT bundle
+      # the freedesktop 25.08 SDK stack — see flatter.yml's identical step.
+      - name: Install runtime dependencies
+        run: |
+          set -euo pipefail
+          flatpak install -y --system flathub \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk//25.08 \
+            org.freedesktop.Sdk.Extension.node22//25.08 \
+            org.electronjs.Electron2.BaseApp//25.08
+
       - name: Build
         uses: andyholmes/flatter@main
         with:
@@ -127,7 +139,7 @@ jobs:
           # DERIVE $VER from the bundle filenames in this job (avoids matrix
           # job-output propagation, which GitHub only propagates from the
           # last matrix leg). Version derived at build time from
-          # pyproject.toml may differ slightly from the upstream tag —
+          # pyproject.toml may differ slightly from the upstream tag ?
           # publish as the manifest-derived version, keeping the upstream
           # tag as the fetch handle.
           VER=$(ls bundles/Hermes-*-x86_64.flatpak | sed 's/.*Hermes-\(.*\)-x86_64\.flatpak/\1/')
@@ -143,5 +155,3 @@ jobs:
           Install:
               flatpak install --user ./Hermes-$VER-x86_64.flatpak" \
             bundles/*
-
-# registration touch
