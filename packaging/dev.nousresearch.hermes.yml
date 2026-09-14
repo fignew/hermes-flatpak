@@ -192,6 +192,13 @@ modules:
         url: https://github.com/NousResearch/hermes-agent.git
         branch: __HERMES_REF__
         disable-shallow-clone: true
+        # upstream history contains objects git (>=1.8.5) fsck flags with
+        # `zeroPaddedFilemode`; flatpak-builder sets transfer.fsckObjects=1
+        # on its mirror clones, so fetch dies mid-clone without this.
+        # Disable fsck ONLY for this transient mirror dir — the actual
+        # checkout is then done locally from the mirror, no integrity gap
+        # beyond what the flatpak-builder tree hash already covers.
+        disable-fsckobjects: true
       - type: archive
         url: https://github.com/astral-sh/uv/releases/download/0.12.9/uv-x86_64-unknown-linux-gnu.tar.gz
         sha256: ec7a99cd05e0cd7f80243f135ce1361c76835cb0ee60055d14d20eba8eba1460
