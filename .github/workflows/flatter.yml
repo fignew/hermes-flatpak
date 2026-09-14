@@ -9,7 +9,7 @@ name: Flatter
 
 on:
   schedule:
-    # 04:37 UTC daily — deliberately off the top-of-hour cron herd.
+    # 04:37 UTC daily ? deliberately off the top-of-hour cron herd.
     - cron: "37 4 * * *"
   workflow_dispatch:
     inputs:
@@ -137,5 +137,5 @@ jobs:
           Install:
               flatpak install --user ./Hermes-$VER-x86_64.flatpak
 
-          Building for aarch64 too — pick the file matching your machine." \
+          Building for aarch64 too ? pick the file matching your machine." \
             bundles/*
