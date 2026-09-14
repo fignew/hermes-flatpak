@@ -53,8 +53,13 @@ jobs:
             sleep 30
           done
           [ -n "$COMMIT" ] || { echo "::error::could not resolve ref '$REF'"; exit 1; }
-          AGENT_VER=$(curl -fsSL "https://raw.githubusercontent.com/NousResearch/hermes-agent/$COMMIT/pyproject.toml" \
-            | grep -m1 '^version = ' | sed 's/version = "\(.*\)"/\1/')
+          AGENT_VER=""
+          for i in 1 2 3; do
+            curl -fsSL "https://raw.githubusercontent.com/NousResearch/hermes-agent/$COMMIT/pyproject.toml" -o /tmp/pyproject.toml && break
+            echo "attempt $i: pyproject fetch failed; retrying in 30s"; sleep 30
+          done
+          AGENT_VER=$(grep -m1 '^version = ' /tmp/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          [ -n "$AGENT_VER" ] || { echo "::error::could not extract agent version"; exit 1; }
           echo "ref=$REF"            >> "$GITHUB_OUTPUT"
           echo "commit=$COMMIT"      >> "$GITHUB_OUTPUT"
           echo "version=$AGENT_VER"  >> "$GITHUB_OUTPUT"
