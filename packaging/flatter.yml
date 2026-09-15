@@ -216,16 +216,21 @@ jobs:
         run: |
           set -euo pipefail
           # flatter's action always names its uploads 'github-pages' (one per
-          # matrix leg); actions/download-artifact@v4 can't pattern-match two
-          # same-named artifacts, so pull them via the API by artifact ID.
+          # matrix leg); fetch both via the API by artifact ID with curl
+          # (the container has no gh CLI).
           mkdir -p repos
-          api=/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts
-          for id in $(gh api "$api?per_page=100" --jq '.artifacts[] | select(.name=="github-pages") | .id'); do
+          auth="Authorization: token $GH_TOKEN"
+          ids=$(curl -fsSL -H "$auth" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100" \
+            | grep -o '"id": *[0-9]*' | grep -o '[0-9]*')
+          echo "artifact ids: $ids"
+          for id in $ids; do
             mkdir -p "repos/$id"
-            gh api "$api/$id/zip" > "repos/$id/artifact.zip"
+            curl -fSL -H "$auth" -o "repos/$id/artifact.zip" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip"
             unzip -q "repos/$id/artifact.zip" -d "repos/$id"
+            rm -f "repos/$id/artifact.zip"
           done
-          for z in repos/*/artifact.zip; do rm -f "$z"; done   # flatten later
 
       - name: Unpack + merge repos (ostree pull-local)
         run: |
