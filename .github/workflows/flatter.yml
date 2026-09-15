@@ -247,7 +247,7 @@ jobs:
               cp -a "unpacked/$d/repo/." merged/
               first=0
             else
-              flatpak --repo=merged pull-local --untrusted "unpacked/$d/repo"
+              ostree --repo=merged pull-local --untrusted "unpacked/$d/repo"
             fi
           done
           flatpak build-update-repo merged
