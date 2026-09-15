@@ -121,7 +121,6 @@ modules:
         sha256: 01bf8339ec129cc00f4b4b2c6056ef1a7c5b52df39ff83ad17c9b16818aec500
         strip-components: 0
         only-arches: [x86_64]
-        only-arches: [x86_64]
       - type: file
         path: cua-driver.sh
 
