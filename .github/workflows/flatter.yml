@@ -262,14 +262,18 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
-          for id in $(curl -fsSL -H "Authorization: token $GH_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100" \
-            | grep -o '"name": *"github-pages"[^}]*"id": *[0-9]*' | grep -o '[0-9]*$' || true); do
-            name=$(curl -fsSL -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id" \
-              | grep -o '"name": *"[^"]*"' | head -1)
-            case "$name" in *"github-pages"*) curl -fsSL -X DELETE -H "Authorization: token $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id"; echo "deleted stale artifact $id";; esac
-          done
+          python3 - "$RUN_ID" "$GH_TOKEN" "$GITHUB_REPOSITORY" <<'EOP'
+          import json, sys, urllib.request
+          run_id, token, repo = sys.argv[1:4]
+          def api(url, method='GET'):
+              req = urllib.request.Request(url, method=method, headers={'Authorization': 'token ' + token, 'Accept': 'application/vnd.github+json', 'User-Agent': 'flatpak-ci'})
+              return urllib.request.urlopen(req).read()
+          data = json.loads(api(f'https://api.github.com/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100').decode())
+          for a in data.get('artifacts', []):
+              if a['name'] == 'github-pages':
+                  api(f"https://api.github.com/repos/{repo}/actions/artifacts/{a['id']}", 'DELETE')
+                  print(f"deleted stale artifact {a['id']}")
+          EOP
 
       - name: Tar merged repo (deploy-pages contract)
         run: |
