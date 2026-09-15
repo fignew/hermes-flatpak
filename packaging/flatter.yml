@@ -253,6 +253,24 @@ jobs:
           flatpak build-update-repo merged
           printf '[Flatpak Repo]\nTitle=Hermes Nightly (unofficial)\nDescription=Unofficial nightly flatpak repo for Hermes Desktop\nUrl=https://fignew.github.io/hermes-flatpak\nHomepage=https://github.com/fignew/hermes-flatpak\nDeployCollection=yes\nDefaultBranch=master\n' > merged/index.flatpakrepo
 
+      # Reruns of this workflow accumulate same-named artifacts; deploy-pages
+      # rejects "Multiple artifacts named github-pages". Delete leftovers
+      # from previous attempts of THIS run before uploading.
+      - name: Delete stale github-pages artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          for id in $(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100" \
+            | grep -o '"name": *"github-pages"[^}]*"id": *[0-9]*' | grep -o '[0-9]*$' || true); do
+            name=$(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id" \
+              | grep -o '"name": *"[^"]*"' | head -1)
+            case "$name" in *"github-pages"*) curl -fsSL -X DELETE -H "Authorization: token $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id"; echo "deleted stale artifact $id";; esac
+          done
+
       - name: Tar merged repo (deploy-pages contract)
         run: |
           set -euo pipefail
