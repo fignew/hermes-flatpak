@@ -60,10 +60,11 @@ modules:
 
   # ripgrep 14.1.1 — the agent's file search prefers rg over grep; bundling
   # the static musl binary keeps that fast path inside the sandbox. x86_64
-  # only: no official aarch64 musl release; install is skipped on aarch64
-  # (the agent falls back to grep there).
+  # only: no official aarch64 musl release; module skipped on aarch64 (the
+  # agent falls back to grep there).
   - name: ripgrep
     buildsystem: simple
+    only-arches: [x86_64]
     build-commands:
       - |
         if [ "$(uname -m)" != "x86_64" ]; then
@@ -101,6 +102,8 @@ modules:
   # embedders, NOT needed by the CLI (no NEEDED entries) — skipped here.
   - name: cua-driver
     buildsystem: simple
+    # computer-use driver ships x86_64 binary only upstream
+    only-arches: [x86_64]
     build-commands:
       - install -Dm755 cua-driver -t /app/lib/cua-driver/
       - install -Dm755 cua-cursor-theme -t /app/lib/cua-driver/
@@ -117,6 +120,7 @@ modules:
         url: https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.23.2/cua-driver-rs-0.23.2-linux-x86_64-binary.tar.gz
         sha256: 01bf8339ec129cc00f4b4b2c6056ef1a7c5b52df39ff83ad17c9b16818aec500
         strip-components: 0
+        only-arches: [x86_64]
         only-arches: [x86_64]
       - type: file
         path: cua-driver.sh
