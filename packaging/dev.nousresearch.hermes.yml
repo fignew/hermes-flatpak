@@ -205,7 +205,6 @@ modules:
         url: https://github.com/NousResearch/hermes-agent.git
         branch: __HERMES_REF__
         dest: hermes-agent
-        disable-shallow-clone: true
         # upstream history contains objects git (>=1.8.5) fsck flags with
         # `zeroPaddedFilemode`; flatpak-builder sets transfer.fsckObjects=1
         # on its mirror clones, so fetch dies mid-clone without this.
@@ -213,11 +212,6 @@ modules:
         # is then done locally from the mirror, no integrity gap beyond what
         # the flatpak-builder tree hash already covers.
         disable-fsckobjects: true
-        # The mirror's full-clone fetch then walks git-lfs and chokes on LFS
-        # pointers for (some) historical objects — upstream LFS object store
-        # 404s them. None of the desktop build path needs LFS assets; skip
-        # explicit LFS fetching entirely.
-        disable-lfs: true
       # uv v0.12.9 — pinned per-arch; the script probes uv-dist for either
       # layout (triplet subdir or stripped top dir).
       - type: archive
