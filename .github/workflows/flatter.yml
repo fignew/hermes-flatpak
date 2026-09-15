@@ -222,6 +222,8 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      # artifact deletion (stale github-pages cleanup for reruns)
+      actions: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
