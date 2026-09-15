@@ -177,7 +177,8 @@ modules:
         npm ci --workspace apps/desktop --workspace apps/shared --no-audit --no-fund
         cd apps/desktop
         npm run build
-        NODE_OPTIONS=--max-old-space-size=4096 node scripts/run-electron-builder.mjs --linux dir --x64
+        NODE_ARCH=$(uname -m | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/')
+NODE_OPTIONS=--max-old-space-size=4096 node scripts/run-electron-builder.mjs --linux dir --$NODE_ARCH
         mkdir -p /app/hermes
         cp -ra release/linux-unpacked/. /app/hermes/
         install -Dm755 "$MODDIR/hermes.sh" /app/bin/hermes-desktop
