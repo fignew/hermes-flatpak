@@ -1,4 +1,4 @@
-name: upstream-watch
+name: Upstream Release Watch
 
 # Optional helper: cancel the schedule and dispatch an immediate
 # flatter-release build as soon as a new upstream release tag appears, rather
@@ -41,7 +41,7 @@ jobs:
             echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Dispatch flatter-release
+      - name: Dispatch Flatpak Release Build
         if: steps.detect.outputs.tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

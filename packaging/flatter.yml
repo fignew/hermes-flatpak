@@ -1,4 +1,4 @@
-name: Flatter
+name: Flatpak Nightly Build
 
 # Daily rebuild of the Hermes Desktop flatpak tracking hermes-agent `main`.
 # This is the bleeding-edge channel; release tags are built separately
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   flatter:
-    name: "Flatter (${{ matrix.arch }})"
+    name: "Flatpak Nightly (${{ matrix.arch }})"
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     container:
       image: ghcr.io/andyholmes/flatter/freedesktop:25.08
@@ -154,7 +154,7 @@ jobs:
           if-no-files-found: error
 
   nightly-release:
-    name: Rolling nightly release
+    name: Publish rolling nightly
     needs: flatter
     runs-on: ubuntu-latest
     permissions:
