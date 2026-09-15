@@ -76,6 +76,31 @@ jobs:
             org.freedesktop.Sdk.Extension.node22//25.08 \
             org.electronjs.Electron2.BaseApp//25.08
 
+      # git-lfs shim: the flatter flatpak-builder patch runs `git lfs fetch --all`
+      # and on failure `git lfs logs last` — which exits 2 when the log is empty,
+      # killing the build. Historical LFS pointers (deleted binaries) 404 in the
+      # upstream object store, so the shutdown path always triggers here.
+      # Shim: make `logs` subcommands exit 0; everything else execs the real
+      # git-lfs. Current-commit LFS objects (app icons) fetch fine earlier in
+      # the same flow ("3 objects found").
+      - name: Shim git-lfs logs diagnostics
+        run: |
+          set -euo pipefail
+          REAL=$(command -v git-lfs || true)
+          mkdir -p /usr/local/lfs-shim
+          {
+            echo '#!/bin/sh'
+            echo 'case "$1" in logs) exit 0 ;; esac'
+            if [ -n "$REAL" ] && [ "$REAL" != "/usr/local/lfs-shim/git-lfs" ]; then
+              echo "exec ${REAL} \"\$@\""
+            else
+              echo 'exit 0'
+            fi
+          } > /usr/local/lfs-shim/git-lfs
+          chmod +x /usr/local/lfs-shim/git-lfs
+          export PATH="/usr/local/lfs-shim:$PATH"
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
+
       - name: Build
         uses: andyholmes/flatter@main
         with:
