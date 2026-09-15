@@ -161,7 +161,13 @@ modules:
         mkdir -p /app/lib /app/etc
         cp -a hermes-agent /app/lib/hermes-agent
         cd /app/lib/hermes-agent
-        uv sync --locked --extra all
+        # upstream main's uv.lock drifts against pyproject (they regenerate
+        # at release time); on a moving ref we must tolerate that. Locked
+        # remains for pinned tag builds where the lockfile is coherent.
+        if ! uv sync --locked --extra all; then
+          echo "uv.lock out of sync with pyproject (expected on fast-moving main); re-locking"
+          uv sync --extra all
+        fi
         # Ship a system gitconfig so the bundled agent can operate on its
         # (root-owned, read-only) checkout without "dubious ownership".
         printf '[safe]\n\tdirectory = /app/lib/hermes-agent\n' > /app/etc/gitconfig
