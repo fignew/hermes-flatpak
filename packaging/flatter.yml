@@ -274,7 +274,7 @@ jobs:
       - name: Tar merged repo (deploy-pages contract)
         run: |
           set -euo pipefail
-          tar --dereference --hard-dereference -cf artifact.tar --exclude=.git merged
+          tar --dereference --hard-dereference -cf artifact.tar --exclude=.git -C merged .
           echo "artifact.tar: $(stat -c%s artifact.tar) bytes"
 
       - name: Upload github-pages artifact
