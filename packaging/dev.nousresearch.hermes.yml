@@ -218,11 +218,18 @@ modules:
         # 404s them. None of the desktop build path needs LFS assets; skip
         # explicit LFS fetching entirely.
         disable-lfs: true
+      # uv v0.12.9 — pinned per-arch; the script probes uv-dist for either
+      # layout (triplet subdir or stripped top dir).
       - type: archive
         url: https://github.com/astral-sh/uv/releases/download/0.12.9/uv-x86_64-unknown-linux-gnu.tar.gz
         sha256: ec7a99cd05e0cd7f80243f135ce1361c76835cb0ee60055d14d20eba8eba1460
         dest: uv-dist
         only-arches: [x86_64]
+      - type: archive
+        url: https://github.com/astral-sh/uv/releases/download/0.12.9/uv-aarch64-unknown-linux-gnu.tar.gz
+        sha256: c36fe17937ff6bd16dc42fc13854b5465999fcab2efe0af559381e945e3c6001
+        dest: uv-dist
+        only-arches: [aarch64]
       - type: file
         path: hermes.sh
       - type: file
