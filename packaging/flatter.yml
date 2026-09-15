@@ -128,7 +128,9 @@ jobs:
           # Publish the flatpak REPO itself to GitHub Pages — upload only
           # from ONE matrix leg, else both race the same 'github-pages'
           # artifact name.
-          upload-pages-artifact: ${{ matrix.arch == 'aarch64' }}
+          # Per-arch repo artifacts for the merge step (upload from BOTH legs,
+          # distinct artifact names so no race; merged in pages-deploy).
+          upload-pages-artifact: true
           flatpak-build-bundle-args: |
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
           # Per-arch cache keys so x86_64 and aarch64 don't fight over one
@@ -191,13 +193,15 @@ jobs:
           Install:
               flatpak install --user ./Hermes-$VER-x86_64.flatpak
 
-          Building for aarch64 too ? pick the file matching your machine." \
+          "Aarch64 bundles are built too - pick the file matching your machine." \
             bundles/*
-
   pages-deploy:
     name: Deploy flatpak repo (GitHub Pages)
-    needs: flatter
+    needs: [flatter, nightly-release]
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/andyholmes/flatter/freedesktop:25.08
+      options: --privileged
     permissions:
       pages: write
       id-token: write
@@ -205,6 +209,47 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Download per-arch repo artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: github-pages-*
+          path: repos
+          merge-multiple: false
+
+      - name: Unpack + merge repos (ostree pull-local)
+        run: |
+          set -euo pipefail
+          mkdir -p merged
+          first=1
+          for tarfile in repos/*/artifact.tar; do
+            d=$(basename "$(dirname "$tarfile")")
+            mkdir -p "unpacked/$d"
+            tar -xf "$tarfile" -C "unpacked/$d"
+            echo "$d:"; ls "unpacked/$d" | head -3
+            if [ "$first" = 1 ]; then
+              cp -a "unpacked/$d/." merged/
+              first=0
+            else
+              flatpak --repo=merged pull-local --untrusted "unpacked/$d"
+            fi
+          done
+          flatpak build-update-repo merged
+
+      - name: Upload merged repo as github-pages artifact
+        run: |
+          set -euo pipefail
+          # actions/deploy-pages looks for an artifact named 'github-pages' containing a tar
+          cd merged
+          tar --dereference --hard-dereference -cf ../artifact.tar --exclude=.git .
+          echo "artifact.tar bytes: $(stat -c%s ../artifact.tar)"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: artifact.tar
+          retention-days: 1
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
