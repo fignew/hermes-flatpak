@@ -38,7 +38,9 @@ echo "-- flatpak info --"
 flatpak info "$APP_ID" 2>&1 | head -30
 flatpak info --show-metadata "$APP_ID" > /tmp/metainfo.xml 2>/dev/null || \
     fail "could not read installed metadata"
-grep -q "runtime/org.freedesktop.Platform/${FP_ARCH}/25.08" /tmp/metainfo.xml \
+# `flatpak info --show-metadata` prints the deployment XML; the runtime lives
+# under <metadata key="runtime">org.freedesktop.Platform/<arch>/25.08</metadata>.
+grep -q "org.freedesktop.Platform/${FP_ARCH}/25.08" /tmp/metainfo.xml \
     || fail "runtime is not the expected freedesktop 25.08 for ${FP_ARCH}"
 grep -q 'org.electronjs.Electron2.BaseApp' /tmp/metainfo.xml \
     || fail "BaseApp not declared in metadata"
