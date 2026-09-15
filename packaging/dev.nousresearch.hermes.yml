@@ -178,9 +178,11 @@ modules:
         cd apps/desktop
         npm run build
         NODE_ARCH=$(uname -m | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/')
+        # x64 builds unpack to release/linux-unpacked; arm64 to linux-arm64-unpacked
+        if [ "$NODE_ARCH" = arm64 ]; then UNPACKED=release/linux-arm64-unpacked; else UNPACKED=release/linux-unpacked; fi
         NODE_OPTIONS=--max-old-space-size=4096 node scripts/run-electron-builder.mjs --linux dir --$NODE_ARCH
         mkdir -p /app/hermes
-        cp -ra release/linux-unpacked/. /app/hermes/
+        cp -ra "$UNPACKED"/. /app/hermes/
         install -Dm755 "$MODDIR/hermes.sh" /app/bin/hermes-desktop
         install -Dm755 "$MODDIR/hermes-cli.sh" /app/bin/hermes
         install -Dm644 "$MODDIR/dev.nousresearch.hermes.desktop" -t /app/share/applications/
