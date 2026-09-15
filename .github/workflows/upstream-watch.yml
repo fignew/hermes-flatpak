@@ -52,5 +52,3 @@ jobs:
             --ref main \
             -f tag="$TAG"
           echo "dispatched flatter-release for $TAG"
-
-# registration touch
