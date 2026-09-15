@@ -188,12 +188,12 @@ jobs:
           gh release create nightly \
             --repo "$GITHUB_REPOSITORY" \
             --title "Hermes nightly $VER ($(date -u +%Y-%m-%d))" \
-            --notes "Rolling nightly flatpak of Hermes Desktop, built from hermes-agent \`main\` (packaged version $VER).
+            --notes "Rolling nightly flatpak of Hermes Desktop, built from hermes-agent main (packaged version $VER).
 
           Install:
               flatpak install --user ./Hermes-$VER-x86_64.flatpak
 
-          "Aarch64 bundles are built too - pick the file matching your machine." \
+          Aarch64 bundles are built too - pick the file matching your machine." \
             bundles/*
   pages-deploy:
     name: Deploy flatpak repo (GitHub Pages)
