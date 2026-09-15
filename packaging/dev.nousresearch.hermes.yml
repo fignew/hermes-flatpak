@@ -152,7 +152,7 @@ modules:
         export UV_PYTHON=/usr/bin/python3
         # flatpak-builder strips the archive's top-level dir by default, so
         # the binaries may land at uv-dist/uv OR uv-dist/<triplet>/uv.
-        UVBIN="$MODDIR/uv-dist/uv-x86_64-unknown-linux-gnu"
+        UVBIN="$MODDIR/uv-dist/uv-$(uname -m)-unknown-linux-gnu"
         [ -x "$UVBIN/uv" ] || UVBIN="$MODDIR/uv-dist"
         export PATH="$UVBIN:$PATH"
         command -v uv >/dev/null || { echo "FATAL: uv not found in $MODDIR/uv-dist"; ls -la "$MODDIR/uv-dist"; exit 1; }
@@ -178,7 +178,7 @@ modules:
         cd apps/desktop
         npm run build
         NODE_ARCH=$(uname -m | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/')
-NODE_OPTIONS=--max-old-space-size=4096 node scripts/run-electron-builder.mjs --linux dir --$NODE_ARCH
+        NODE_OPTIONS=--max-old-space-size=4096 node scripts/run-electron-builder.mjs --linux dir --$NODE_ARCH
         mkdir -p /app/hermes
         cp -ra release/linux-unpacked/. /app/hermes/
         install -Dm755 "$MODDIR/hermes.sh" /app/bin/hermes-desktop
