@@ -91,6 +91,11 @@ jobs:
           {
             echo '#!/bin/sh'
             echo 'case "$1" in logs) exit 0 ;; esac'
+            echo '# fetch --all walks every historical ref'"'"'s LFS pointers; two deleted'
+            echo '# binaries 404 upstream and abort the batch. The current-commit'
+            echo '# icons are fetched at checkout (git lfs checkout), so a no-op here'
+            echo '# is safe.'
+            echo 'if [ "$1" = fetch ] && [ "$2" = --all ]; then exit 0; fi'
             if [ -n "$REAL" ] && [ "$REAL" != "/usr/local/lfs-shim/git-lfs" ]; then
               echo "exec ${REAL} \"\$@\""
             else
