@@ -209,23 +209,35 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Download per-arch repo artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: github-pages-*
-          path: repos
-          merge-multiple: false
+      - name: Download per-arch pages artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # flatter's action always names its uploads 'github-pages' (one per
+          # matrix leg); actions/download-artifact@v4 can't pattern-match two
+          # same-named artifacts, so pull them via the API by artifact ID.
+          mkdir -p repos
+          api=/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts
+          for id in $(gh api "$api?per_page=100" --jq '.artifacts[] | select(.name=="github-pages") | .id'); do
+            mkdir -p "repos/$id"
+            gh api "$api/$id/zip" > "repos/$id/artifact.zip"
+            unzip -q "repos/$id/artifact.zip" -d "repos/$id"
+          done
+          for z in repos/*/artifact.zip; do rm -f "$z"; done   # flatten later
 
       - name: Unpack + merge repos (ostree pull-local)
         run: |
           set -euo pipefail
+          # Each pages artifact.zip contains artifact.tar with that arch's repo
           mkdir -p merged
           first=1
-          for tarfile in repos/*/artifact.tar; do
-            d=$(basename "$(dirname "$tarfile")")
+          for z in repos/*/artifact.tar; do
+            d=$(basename "$(dirname "$z")")
             mkdir -p "unpacked/$d"
-            tar -xf "$tarfile" -C "unpacked/$d"
-            echo "$d:"; ls "unpacked/$d" | head -3
+            tar -xf "$z" -C "unpacked/$d"
+            echo "$d:"
             if [ "$first" = 1 ]; then
               cp -a "unpacked/$d/." merged/
               first=0
