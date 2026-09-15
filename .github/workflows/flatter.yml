@@ -20,6 +20,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: flatter
@@ -123,6 +125,10 @@ jobs:
           # rename + re-upload it under our own name; flatter's own artifact
           # is harmless duplication).
           upload-bundles: true
+          # Publish the flatpak REPO itself to GitHub Pages — upload only
+          # from ONE matrix leg, else both race the same 'github-pages'
+          # artifact name.
+          upload-pages-artifact: ${{ matrix.arch == 'aarch64' }}
           flatpak-build-bundle-args: |
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
           # Per-arch cache keys so x86_64 and aarch64 don't fight over one
@@ -187,3 +193,18 @@ jobs:
 
           Building for aarch64 too ? pick the file matching your machine." \
             bundles/*
+
+  pages-deploy:
+    name: Deploy flatpak repo (GitHub Pages)
+    needs: flatter
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
