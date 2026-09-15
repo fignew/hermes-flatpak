@@ -137,6 +137,23 @@ jobs:
           # repository-cache entry.
           cache-key: flatter-${{ matrix.arch }}
 
+      # Publish the flatpak REPO (ostree objects + summary) for the pages
+      # merge step. Each arch gets its own artifact name — no collisions,
+      # and the small repo subset (no deltas) is a few hundred MB.
+      - name: Archive flatpak repo
+        run: |
+          set -euo pipefail
+          tar -cf flatpak-repo.tar repo
+          sha256sum flatpak-repo.tar
+
+      - name: Upload flatpak repo
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-repo-${{ matrix.arch }}
+          path: flatpak-repo.tar
+          retention-days: 1
+          if-no-files-found: error
+
       # flatter leaves the bundle at <app-id>.flatpak with branch 'master'
       # (taken from the manifest). Rename to Hermes-<ver>-<arch>.flatpak to
       # match AGENTS.md's naming convention, then smoke-test the renamed one.
@@ -209,63 +226,46 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Download per-arch pages artifacts
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          # flatter's action always names its uploads 'github-pages' (one per
-          # matrix leg); fetch both via the API by artifact ID with curl
-          # (the container has no gh CLI).
-          mkdir -p repos
-          auth="Authorization: token $GH_TOKEN"
-          ids=$(curl -fsSL -H "$auth" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100" \
-            | grep -o '"id": *[0-9]*' | grep -o '[0-9]*')
-          echo "artifact ids: $ids"
-          for id in $ids; do
-            mkdir -p "repos/$id"
-            curl -fSL -H "$auth" -o "repos/$id/artifact.zip" \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip"
-            unzip -q "repos/$id/artifact.zip" -d "repos/$id"
-            rm -f "repos/$id/artifact.zip"
-          done
+      - name: Download per-arch repo tarballs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: flatpak-repo-*
+          path: repos
+          merge-multiple: false
 
-      - name: Unpack + merge repos (ostree pull-local)
+      - name: Merge repos (ostree pull-local)
         run: |
           set -euo pipefail
-          # Each pages artifact.zip contains artifact.tar with that arch's repo
           mkdir -p merged
           first=1
-          for z in repos/*/artifact.tar; do
-            d=$(basename "$(dirname "$z")")
+          for tarfile in repos/*/flatpak-repo.tar; do
+            d=$(basename "$(dirname "$tarfile")")
             mkdir -p "unpacked/$d"
-            tar -xf "$z" -C "unpacked/$d"
+            tar -xf "$tarfile" -C "unpacked/$d"
             echo "$d:"
             if [ "$first" = 1 ]; then
-              cp -a "unpacked/$d/." merged/
+              cp -a "unpacked/$d/repo/." merged/
               first=0
             else
-              flatpak --repo=merged pull-local --untrusted "unpacked/$d"
+              flatpak --repo=merged pull-local --untrusted "unpacked/$d/repo"
             fi
           done
           flatpak build-update-repo merged
+          printf '[Flatpak Repo]\nTitle=Hermes Nightly (unofficial)\nDescription=Unofficial nightly flatpak repo for Hermes Desktop\nUrl=https://fignew.github.io/hermes-flatpak\nHomepage=https://github.com/fignew/hermes-flatpak\nDeployCollection=yes\nDefaultBranch=master\n' > merged/index.flatpakrepo
 
-      - name: Upload merged repo as github-pages artifact
+      - name: Tar merged repo (deploy-pages contract)
         run: |
           set -euo pipefail
-          # actions/deploy-pages looks for an artifact named 'github-pages' containing a tar
-          cd merged
-          tar --dereference --hard-dereference -cf ../artifact.tar --exclude=.git .
-          echo "artifact.tar bytes: $(stat -c%s ../artifact.tar)"
+          tar --dereference --hard-dereference -cf artifact.tar --exclude=.git merged
+          echo "artifact.tar: $(stat -c%s artifact.tar) bytes"
 
-      - name: Upload
+      - name: Upload github-pages artifact
         uses: actions/upload-artifact@v4
         with:
           name: github-pages
           path: artifact.tar
           retention-days: 1
+          if-no-files-found: error
 
       - name: Deploy to GitHub Pages
         id: deployment
