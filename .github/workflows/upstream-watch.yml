@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   watch:
@@ -49,6 +50,6 @@ jobs:
         run: |
           gh workflow run flatter-release.yml \
             --repo "$GITHUB_REPOSITORY" \
-            --ref main \
+            --ref master \
             -f tag="$TAG"
           echo "dispatched flatter-release for $TAG"
