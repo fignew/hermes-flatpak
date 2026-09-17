@@ -44,6 +44,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup GPG
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
       - name: Resolve upstream ref and commit
         id: upstream
         run: |
@@ -121,6 +128,7 @@ jobs:
           files: |
             dev.nousresearch.hermes.yml
           arch: ${{ matrix.arch }}
+          gpg-sign: ${{ steps.gpg.outputs.fingerprint }}
           # Have flatter produce the single-file bundle .flatpak (we then
           # rename + re-upload it under our own name; flatter's own artifact
           # is harmless duplication).
@@ -235,6 +243,13 @@ jobs:
           path: repos
           merge-multiple: false
 
+      - name: Setup GPG
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
       - name: Merge repos (ostree pull-local)
         run: |
           set -euo pipefail
@@ -252,8 +267,12 @@ jobs:
               ostree --repo=merged pull-local --untrusted "unpacked/$d/repo"
             fi
           done
-          flatpak build-update-repo merged
-          printf '[Flatpak Repo]\nTitle=Hermes Nightly (unofficial)\nDescription=Unofficial nightly flatpak repo for Hermes Desktop\nUrl=https://fignew.github.io/hermes-flatpak\nHomepage=https://github.com/fignew/hermes-flatpak\nDeployCollection=yes\nDefaultBranch=master\n' > merged/index.flatpakrepo
+          # Re-sign the merged summary: build-update-repo rewrites it, so the
+          # per-arch signatures are discarded unless we pass --gpg-sign here.
+          FINGERPRINT="${{ steps.gpg.outputs.fingerprint }}"
+          GPGKEY_B64=$(gpg --armor --export "$FINGERPRINT" | base64 -w0)
+          flatpak build-update-repo --gpg-sign="$FINGERPRINT" merged
+          printf '[Flatpak Repo]\nTitle=Hermes Nightly (unofficial)\nDescription=Unofficial nightly flatpak repo for Hermes Desktop\nUrl=https://fignew.github.io/hermes-flatpak\nHomepage=https://github.com/fignew/hermes-flatpak\nDeployCollection=yes\nDefaultBranch=master\nGPGKey=%s\n' "$GPGKEY_B64" > merged/index.flatpakrepo
 
       # Reruns of this workflow accumulate same-named artifacts; deploy-pages
       # rejects "Multiple artifacts named github-pages". Delete leftovers
